@@ -9,6 +9,7 @@ from sklearn.metrics import accuracy_score, roc_auc_score, precision_score, reca
 import pickle
 import joblib
 import warnings
+import os
 warnings.filterwarnings('ignore')
 
 # Import ML models
@@ -284,7 +285,6 @@ elif app_mode == "Model Evaluation":
     st.header("📈 Model Evaluation and Comparison")
     
     # Load pre-trained models if available
-    import os
     model_files = [f for f in os.listdir("model") if f.endswith(".pkl") and f != "scaler.pkl"]
     
     if not model_files:
@@ -489,4 +489,5 @@ st.sidebar.info("""
 **Machine Learning - Assignment 2**  
 **Dataset:** Breast Cancer Wisconsin (Diagnostic)  
 **Models:** 6 Classification Algorithms
+
 """)
