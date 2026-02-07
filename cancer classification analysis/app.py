@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.model_selection import train_test_split
@@ -489,4 +491,5 @@ st.sidebar.info("""
 **Machine Learning - Assignment 2**  
 **Dataset:** Breast Cancer Wisconsin (Diagnostic)  
 **Models:** 6 Classification Algorithms
+
 """)
