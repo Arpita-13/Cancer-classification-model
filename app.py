@@ -385,99 +385,203 @@ elif app_mode == "Model Evaluation":
 
 # Make Predictions Section
 elif app_mode == "Make Predictions":
-    st.header("🔍 Make Predictions on New Data")
+    st.header("🔍 Make Predictions Using Repository Data")
     
     st.info("""
-    💡 Upload a CSV file with test data for prediction. 
-    The file should contain the same 30 features as the training data.
+    💡 This section uses the **data.csv** file from the repository to make predictions.
+    The models will predict whether each sample is Malignant or Benign.
     """)
     
-    # Upload CSV file
-    uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
-    
-    if uploaded_file is not None:
-        try:
-            # Load the data
-            test_df = pd.read_csv(uploaded_file)
+    # Load data.csv from repository
+    try:
+        # Load the data
+        test_df = pd.read_csv("data.csv")
+        
+        st.success("✅ Successfully loaded data.csv from repository")
+        
+        # Show data info
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Samples", len(test_df))
+        with col2:
+            st.metric("Number of Features", len(test_df.columns))
+        with col3:
+            if 'diagnosis' in test_df.columns:
+                m_count = (test_df['diagnosis'] == 'M').sum()
+                b_count = (test_df['diagnosis'] == 'B').sum()
+                st.metric("M:B Ratio", f"{m_count}:{b_count}")
+        
+        st.subheader("Data Preview")
+        st.dataframe(test_df.head())
+        
+        # Define expected features (from trained models)
+        expected_features = [
+            'radius_mean', 'texture_mean', 'perimeter_mean', 'area_mean',
+            'smoothness_mean', 'compactness_mean', 'concavity_mean',
+            'concave points_mean', 'symmetry_mean', 'fractal_dimension_mean',
+            'radius_se', 'texture_se', 'perimeter_se', 'area_se',
+            'smoothness_se', 'compactness_se', 'concavity_se',
+            'concave points_se', 'symmetry_se', 'fractal_dimension_se',
+            'radius_worst', 'texture_worst', 'perimeter_worst', 'area_worst',
+            'smoothness_worst', 'compactness_worst', 'concavity_worst',
+            'concave points_worst', 'symmetry_worst', 'fractal_dimension_worst'
+        ]
+        
+        # Remove non-feature columns if present
+        columns_to_remove = ['id', 'diagnosis', 'target', 'Unnamed: 32']
+        for col in columns_to_remove:
+            if col in test_df.columns:
+                test_df = test_df.drop(col, axis=1)
+                st.info(f"Removed column: {col}")
+        
+        # Check if all features are present
+        missing_features = [feat for feat in expected_features if feat not in test_df.columns]
+        
+        if missing_features:
+            st.error(f"❌ Missing {len(missing_features)} required features")
+            st.write("First 5 missing features:", missing_features[:5])
+            st.info("""
+            Please ensure data.csv has all 30 features with correct column names.
+            Expected features include: radius_mean, texture_mean, perimeter_mean, etc.
+            """)
+        else:
+            # Reorder columns to match training data
+            test_df = test_df[expected_features]
             
-            st.subheader("Uploaded Data Preview")
-            st.dataframe(test_df.head())
+            # Select model for prediction
+            model_files = [f for f in os.listdir("model") if f.endswith(".pkl") and f != "scaler.pkl"]
             
-            st.write(f"Shape of uploaded data: {test_df.shape}")
-            
-            # Check if all required features are present
-            required_features = df.drop(['target', 'diagnosis'], axis=1).columns.tolist()
-            missing_features = [feat for feat in required_features if feat not in test_df.columns]
-            
-            if missing_features:
-                st.error(f"Missing features: {missing_features}")
+            if not model_files:
+                st.warning("⚠️ No trained models found. Please train models first in the 'Train Models' section.")
             else:
-                # Select model for prediction
-                model_files = [f for f in os.listdir("model") if f.endswith(".pkl") and f != "scaler.pkl"]
+                model_names = [f.replace('.pkl', '').replace('_', ' ').title() for f in model_files]
+                selected_model = st.selectbox("Select Model for Prediction", model_names)
                 
-                if not model_files:
-                    st.warning("No trained models found. Please train models first.")
-                else:
-                    model_names = [f.replace('.pkl', '').replace('_', ' ').title() for f in model_files]
-                    selected_model = st.selectbox("Select model for prediction", model_names)
-                    
-                    if st.button("Make Predictions"):
-                        # Load selected model
-                        model_file = selected_model.lower().replace(' ', '_') + '.pkl'
-                        model_data = joblib.load(f"model/{model_file}")
-                        model = model_data['model']
-                        requires_scaling = model_data.get('requires_scaling', False)
-                        
-                        # Load scaler if needed
-                        if requires_scaling:
-                            scaler = joblib.load("model/scaler.pkl")
-                            X_test = scaler.transform(test_df[required_features])
-                        else:
-                            X_test = test_df[required_features]
-                        
-                        # Make predictions
-                        predictions = model.predict(X_test)
-                        probabilities = model.predict_proba(X_test)
-                        
-                        # Create results dataframe
-                        results_df = test_df.copy()
-                        results_df['Prediction'] = predictions
-                        results_df['Prediction_Label'] = results_df['Prediction'].map({0: 'Malignant', 1: 'Benign'})
-                        results_df['Probability_Malignant'] = probabilities[:, 0]
-                        results_df['Probability_Benign'] = probabilities[:, 1]
-                        
-                        # Display results
-                        st.subheader("Prediction Results")
-                        st.dataframe(results_df[['Prediction_Label', 'Probability_Malignant', 'Probability_Benign']].head())
-                        
-                        # Download results
-                        csv = results_df.to_csv(index=False)
-                        st.download_button(
-                            label="Download Predictions as CSV",
-                            data=csv,
-                            file_name="predictions.csv",
-                            mime="text/csv"
-                        )
-                        
-                        # Show prediction distribution
-                        st.subheader("Prediction Distribution")
-                        pred_dist = results_df['Prediction_Label'].value_counts()
-                        
-                        fig, ax = plt.subplots(1, 2, figsize=(12, 4))
-                        pred_dist.plot(kind='bar', ax=ax[0], color=['salmon', 'lightgreen'])
-                        ax[0].set_title('Prediction Distribution')
-                        ax[0].set_xlabel('Diagnosis')
-                        ax[0].set_ylabel('Count')
-                        
-                        ax[1].pie(pred_dist.values, labels=pred_dist.index, autopct='%1.1f%%',
-                                 colors=['salmon', 'lightgreen'], startangle=90)
-                        ax[1].set_title('Prediction Proportions')
-                        
-                        st.pyplot(fig)
-                        
-        except Exception as e:
-            st.error(f"Error loading file: {str(e)}")
+                if st.button("🚀 Make Predictions", type="primary"):
+                    with st.spinner("Making predictions..."):
+                        try:
+                            # Load selected model
+                            model_file = selected_model.lower().replace(' ', '_') + '.pkl'
+                            model_data = joblib.load(f"model/{model_file}")
+                            model = model_data['model']
+                            requires_scaling = model_data.get('requires_scaling', False)
+                            
+                            # Load scaler if needed
+                            if requires_scaling:
+                                scaler = joblib.load("model/scaler.pkl")
+                                X_test = scaler.transform(test_df[expected_features])
+                            else:
+                                X_test = test_df[expected_features]
+                            
+                            # Make predictions
+                            predictions = model.predict(X_test)
+                            probabilities = model.predict_proba(X_test)
+                            
+                            # Create results dataframe
+                            results_df = test_df.copy()
+                            results_df['Prediction'] = predictions
+                            results_df['Prediction_Label'] = results_df['Prediction'].map({0: 'Malignant', 1: 'Benign'})
+                            results_df['Probability_Malignant'] = probabilities[:, 0]
+                            results_df['Probability_Benign'] = probabilities[:, 1]
+                            
+                            # Display results
+                            st.subheader("📊 Prediction Results")
+                            
+                            # Show sample of results
+                            st.dataframe(results_df[['Prediction_Label', 'Probability_Malignant', 'Probability_Benign']].head(10))
+                            
+                            # Show statistics
+                            st.subheader("📈 Prediction Statistics")
+                            col1, col2, col3, col4 = st.columns(4)
+                            
+                            with col1:
+                                malignant_count = (results_df['Prediction'] == 0).sum()
+                                st.metric("Malignant", malignant_count, 
+                                         delta=f"{(malignant_count/len(results_df)*100):.1f}%")
+                            
+                            with col2:
+                                benign_count = (results_df['Prediction'] == 1).sum()
+                                st.metric("Benign", benign_count,
+                                         delta=f"{(benign_count/len(results_df)*100):.1f}%")
+                            
+                            with col3:
+                                avg_confidence = results_df[['Probability_Malignant', 'Probability_Benign']].max(axis=1).mean()
+                                st.metric("Avg Confidence", f"{avg_confidence:.1%}")
+                            
+                            with col4:
+                                high_conf = (results_df[['Probability_Malignant', 'Probability_Benign']].max(axis=1) > 0.9).sum()
+                                st.metric("High Confidence (>90%)", high_conf)
+                            
+                            # Visualization
+                            st.subheader("📊 Visualization")
+                            fig, axes = plt.subplots(1, 3, figsize=(15, 4))
+                            
+                            # Pie chart
+                            pred_counts = results_df['Prediction_Label'].value_counts()
+                            axes[0].pie(pred_counts.values, labels=pred_counts.index, 
+                                       autopct='%1.1f%%', colors=['salmon', 'lightgreen'],
+                                       startangle=90, explode=(0.05, 0))
+                            axes[0].set_title('Prediction Distribution')
+                            
+                            # Confidence histogram
+                            axes[1].hist(results_df[['Probability_Malignant', 'Probability_Benign']].max(axis=1), 
+                                      bins=20, alpha=0.7, color='skyblue', edgecolor='black')
+                            axes[1].set_xlabel('Confidence Score')
+                            axes[1].set_ylabel('Count')
+                            axes[1].set_title('Confidence Distribution')
+                            axes[1].grid(True, alpha=0.3)
+                            
+                            # Model performance info
+                            axes[2].axis('off')
+                            axes[2].text(0.1, 0.9, f"Model: {selected_model}", fontsize=12, fontweight='bold')
+                            axes[2].text(0.1, 0.7, f"Samples: {len(results_df)}", fontsize=10)
+                            axes[2].text(0.1, 0.5, f"Malignant: {malignant_count}", fontsize=10, color='red')
+                            axes[2].text(0.1, 0.3, f"Benign: {benign_count}", fontsize=10, color='green')
+                            axes[2].text(0.1, 0.1, f"Avg Confidence: {avg_confidence:.1%}", fontsize=10)
+                            
+                            st.pyplot(fig)
+                            
+                            # Download results
+                            st.subheader("💾 Download Results")
+                            csv = results_df.to_csv(index=False)
+                            st.download_button(
+                                label=" Download All Predictions (CSV)",
+                                data=csv,
+                                file_name=f"predictions_{selected_model.replace(' ', '_')}.csv",
+                                mime="text/csv",
+                                help="Download complete predictions with all features"
+                            )
+                            
+                            # Success message
+                            st.success(f" Predictions completed successfully using {selected_model}!")
+                            
+                        except Exception as e:
+                            st.error(f" Error during prediction: {str(e)}")
+                            st.info("Please make sure models are trained first in the 'Train Models' section.")
     
+    except FileNotFoundError:
+        st.error(" data.csv not found in repository.")
+        st.info("""
+        Please ensure 'data.csv' exists in your project directory.
+        
+        You can:
+        1. Upload a CSV file named 'data.csv' to your repository root
+        2. Or run the model training first (it will create sample data)
+        """)
+        
+        # Option to create sample data
+        if st.button("Create Sample Data File"):
+            from sklearn.datasets import load_breast_cancer
+            data = load_breast_cancer()
+            sample_df = pd.DataFrame(data.data, columns=data.feature_names)
+            sample_df['target'] = data.target
+            sample_df['diagnosis'] = sample_df['target'].map({0: 'M', 1: 'B'})
+            sample_df.to_csv("data.csv", index=False)
+            st.success("✅ Created sample data.csv")
+            st.rerun()
+    
+    except Exception as e:
+        st.error(f" Error loading data.csv: {str(e)}")    
     else:
         st.info("👆 Please upload a CSV file to make predictions")
 
@@ -491,3 +595,4 @@ st.sidebar.info("""
 **Models:** 6 Classification Algorithms
 
 """)
+
