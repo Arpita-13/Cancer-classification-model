@@ -19,15 +19,18 @@ from sklearn.ensemble import RandomForestClassifier
 import xgboost as xgb
 
 def load_and_prepare_data():
-    """Load and prepare the breast cancer dataset with CSV-compatible names"""
-    from sklearn.datasets import load_breast_cancer
-    
+    """Load and prepare the breast cancer dataset"""
+    print("Loading dataset...")
     data = load_breast_cancer()
     
-    # Map sklearn names to CSV/Kaggle names
-    sklearn_to_csv = {
+    # Get the original feature names from sklearn
+    original_feature_names = data.feature_names
+    
+    # Create mapping from sklearn names to your CSV column names
+    # This is based on your CSV column names shown in the error
+    feature_mapping = {
         'mean radius': 'radius_mean',
-        'mean texture': 'texture_mean',
+        'mean texture': 'texture_mean', 
         'mean perimeter': 'perimeter_mean',
         'mean area': 'area_mean',
         'mean smoothness': 'smoothness_mean',
@@ -36,7 +39,6 @@ def load_and_prepare_data():
         'mean concave points': 'concave points_mean',
         'mean symmetry': 'symmetry_mean',
         'mean fractal dimension': 'fractal_dimension_mean',
-        
         'radius error': 'radius_se',
         'texture error': 'texture_se',
         'perimeter error': 'perimeter_se',
@@ -47,7 +49,6 @@ def load_and_prepare_data():
         'concave points error': 'concave points_se',
         'symmetry error': 'symmetry_se',
         'fractal dimension error': 'fractal_dimension_se',
-        
         'worst radius': 'radius_worst',
         'worst texture': 'texture_worst',
         'worst perimeter': 'perimeter_worst',
@@ -60,23 +61,28 @@ def load_and_prepare_data():
         'worst fractal dimension': 'fractal_dimension_worst'
     }
     
-    # Create DataFrame with CSV names
-    csv_names = [sklearn_to_csv[name] for name in data.feature_names]
-    df = pd.DataFrame(data.data, columns=csv_names)
+    # Create DataFrame with CSV column names
+    df = pd.DataFrame(data.data, columns=[feature_mapping.get(name, name) for name in original_feature_names])
     df['target'] = data.target
+    df['diagnosis'] = df['target'].apply(lambda x: 'Malignant' if x == 0 else 'Benign')
     
-    # Rest of your function remains the same...
-    X = df.drop('target', axis=1)
+    X = df.drop(['target', 'diagnosis'], axis=1)
     y = df['target']
     
+    # Split the data
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42, stratify=y
     )
     
+    # Scale the features
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
     
+    print(f"Training set: {X_train.shape[0]} samples")
+    print(f"Test set: {X_test.shape[0]} samples")
+    
+    # Save feature names for later use
     return {
         'X_train': X_train,
         'X_test': X_test,
@@ -85,9 +91,10 @@ def load_and_prepare_data():
         'y_train': y_train,
         'y_test': y_test,
         'scaler': scaler,
-        'feature_names': csv_names  # This is KEY - save CSV names
+        'feature_names': X_train.columns.tolist(),  # Use CSV column names
+        'feature_mapping': feature_mapping
     }
-    def train_models(data):
+def train_models(data):
     """Train all 6 classification models"""
     print("\nTraining models...")
     
@@ -226,6 +233,4 @@ def main():
     print("=" * 60)
 
 if __name__ == "__main__":
-
     main()
-
