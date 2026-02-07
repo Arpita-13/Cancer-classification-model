@@ -22,10 +22,51 @@ def load_and_prepare_data():
     """Load and prepare the breast cancer dataset"""
     print("Loading dataset...")
     data = load_breast_cancer()
-    df = pd.DataFrame(data.data, columns=data.feature_names)
-    df['target'] = data.target
     
-    X = df.drop('target', axis=1)
+    # Get the original feature names from sklearn
+    original_feature_names = data.feature_names
+    
+    # Create mapping from sklearn names to your CSV column names
+    # This is based on your CSV column names shown in the error
+    feature_mapping = {
+        'mean radius': 'radius_mean',
+        'mean texture': 'texture_mean', 
+        'mean perimeter': 'perimeter_mean',
+        'mean area': 'area_mean',
+        'mean smoothness': 'smoothness_mean',
+        'mean compactness': 'compactness_mean',
+        'mean concavity': 'concavity_mean',
+        'mean concave points': 'concave points_mean',
+        'mean symmetry': 'symmetry_mean',
+        'mean fractal dimension': 'fractal_dimension_mean',
+        'radius error': 'radius_se',
+        'texture error': 'texture_se',
+        'perimeter error': 'perimeter_se',
+        'area error': 'area_se',
+        'smoothness error': 'smoothness_se',
+        'compactness error': 'compactness_se',
+        'concavity error': 'concavity_se',
+        'concave points error': 'concave points_se',
+        'symmetry error': 'symmetry_se',
+        'fractal dimension error': 'fractal_dimension_se',
+        'worst radius': 'radius_worst',
+        'worst texture': 'texture_worst',
+        'worst perimeter': 'perimeter_worst',
+        'worst area': 'area_worst',
+        'worst smoothness': 'smoothness_worst',
+        'worst compactness': 'compactness_worst',
+        'worst concavity': 'concavity_worst',
+        'worst concave points': 'concave points_worst',
+        'worst symmetry': 'symmetry_worst',
+        'worst fractal dimension': 'fractal_dimension_worst'
+    }
+    
+    # Create DataFrame with CSV column names
+    df = pd.DataFrame(data.data, columns=[feature_mapping.get(name, name) for name in original_feature_names])
+    df['target'] = data.target
+    df['diagnosis'] = df['target'].apply(lambda x: 'Malignant' if x == 0 else 'Benign')
+    
+    X = df.drop(['target', 'diagnosis'], axis=1)
     y = df['target']
     
     # Split the data
@@ -41,6 +82,7 @@ def load_and_prepare_data():
     print(f"Training set: {X_train.shape[0]} samples")
     print(f"Test set: {X_test.shape[0]} samples")
     
+    # Save feature names for later use
     return {
         'X_train': X_train,
         'X_test': X_test,
@@ -49,9 +91,9 @@ def load_and_prepare_data():
         'y_train': y_train,
         'y_test': y_test,
         'scaler': scaler,
-        'feature_names': data.feature_names
+        'feature_names': X_train.columns.tolist(),  # Use CSV column names
+        'feature_mapping': feature_mapping
     }
-
 def train_models(data):
     """Train all 6 classification models"""
     print("\nTraining models...")
@@ -191,4 +233,5 @@ def main():
     print("=" * 60)
 
 if __name__ == "__main__":
+
     main()
